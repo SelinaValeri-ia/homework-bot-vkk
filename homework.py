@@ -7,6 +7,12 @@ import requests
 import vk_api
 from dotenv import load_dotenv
 
+logging.basicConfig(
+    level=logging.DEBUG,
+    filename='program.log',
+    format='%(asctime)s, %(levelname)s, %(message)s, %(name)s'
+)
+
 load_dotenv()
 
 PRACTICUM_TOKEN = os.getenv('PRACTICUM_TOKEN')
@@ -43,7 +49,6 @@ def send_message(vk, message):
         logging.debug(f'Сообщение отправлено: {message}')
     except Exception as e:
         logging.error(f'Ошибка при отправке сообщения: {e}')
-        raise Exception(f'Ошибка VK: {e}')
 
 
 def get_api_answer(timestamp):
@@ -70,15 +75,15 @@ def check_response(response):
     """Проверяет ответ API на соответствие документации."""
     if not isinstance(response, dict):
         logging.error('Ответ не является словарем')
-        raise Exception('Ответ не является словарем')
+        raise TypeError('Ответ не является словарем')
 
     if 'homeworks' not in response:
         logging.error('Нет ключа "homeworks"')
-        raise Exception('Отсутствует ключ homeworks')
+        raise TypeError('Отсутствует ключ homeworks')
 
     if not isinstance(response['homeworks'], list):
         logging.error('Ключ "homeworks" не является списком')
-        raise Exception('homeworks должен быть списком')
+        raise TypeError('homeworks должен быть списком')
 
     if not response['homeworks']:
         logging.debug('В ответе API нет новых статусов')
