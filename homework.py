@@ -2,16 +2,34 @@ import logging
 import os
 import random
 import time
-
 import requests
 import vk_api
 from dotenv import load_dotenv
 
-logging.basicConfig(
-    level=logging.DEBUG,
-    filename='program.log',
-    format='%(asctime)s, %(levelname)s, %(message)s, %(name)s'
-)
+
+class ApiRequestError(Exception):
+    """Ошибка запроса к API."""
+
+    pass
+
+
+class ApiStatusError(Exception):
+    """Ошибка: API вернул не 200."""
+
+    pass
+
+
+class ResponseFormatError(TypeError):
+    """Ошибка формата ответа API."""
+
+    pass
+
+
+class UnknownStatusError(Exception):
+    """Ошибка: неизвестный статус работы."""
+
+    pass
+
 
 load_dotenv()
 
@@ -31,24 +49,30 @@ HOMEWORK_VERDICTS = {
 
 
 def check_tokens():
-    """Проверяет доступность переменных окружения."""
-    if all([PRACTICUM_TOKEN, VK_TOKEN, VK_USER_ID]):
-        return True
-    logging.critical('Отсутствует обязательная переменная окружения')
-    return False
+    """Проверяет наличие переменных окружения."""
+    missing = []
+    if not PRACTICUM_TOKEN:
+        missing.append('PRACTICUM_TOKEN')
+    if not VK_TOKEN:
+        missing.append('VK_TOKEN')
+    if not VK_USER_ID:
+        missing.append('VK_USER_ID')
+    return missing
 
 
 def send_message(vk, message):
-    """Отправляет сообщение в VK-чат пользователя."""
+    """Отправляет сообщение в VK."""
     try:
         vk.messages.send(
             user_id=VK_USER_ID,
             message=message,
             random_id=random.randint(1, 1000000),
         )
-        logging.debug(f'Сообщение отправлено: {message}')
-    except Exception as e:
+        logging.debug(f'Сообщение отправлено: {message[:50]}...')
+    except (vk_api.exceptions.ApiError,
+            requests.exceptions.RequestException) as e:
         logging.error(f'Ошибка при отправке сообщения: {e}')
+        raise
 
 
 def get_api_answer(timestamp):
@@ -60,53 +84,46 @@ def get_api_answer(timestamp):
             params={'from_date': timestamp},
             timeout=10,
         )
-        if response.status_code != 200:
-            raise Exception(
-                f'API недоступно, статус код: {response.status_code}'
-            )
-        return response.json()
+        logging.debug('Отправили запрос к API')
     except requests.exceptions.RequestException as e:
-        error_msg = f'Сбой при запросе к эндпоинту {ENDPOINT}: {e}'
-        logging.error(error_msg)
-        raise Exception(error_msg)
+        raise ApiRequestError(f'Сбой при запросе к эндпоинту {ENDPOINT}: {e}')
+
+    if response.status_code != 200:
+        raise ApiStatusError(
+            f'API недоступно, статус код: {response.status_code}'
+        )
+
+    return response.json()
 
 
 def check_response(response):
-    """Проверяет ответ API на соответствие документации."""
+    """Проверяет ответ API на соответствие ожидаемой структуре."""
     if not isinstance(response, dict):
-        logging.error('Ответ не является словарем')
-        raise TypeError('Ответ не является словарем')
+        raise TypeError('Ответ API не является словарем')
 
     if 'homeworks' not in response:
-        logging.error('Нет ключа "homeworks"')
-        raise TypeError('Отсутствует ключ homeworks')
+        raise TypeError('В ответе API отсутствует ключ "homeworks"')
 
     if not isinstance(response['homeworks'], list):
-        logging.error('Ключ "homeworks" не является списком')
-        raise TypeError('homeworks должен быть списком')
-
-    if not response['homeworks']:
-        logging.debug('В ответе API нет новых статусов')
+        raise TypeError('Ключ "homeworks" не является списком')
 
     return response
 
 
 def parse_status(homework):
-    """Извлекает статус из элемента списка домашних работ."""
+    """Извлекает статус работы и формирует текст сообщения."""
     if 'homework_name' not in homework:
-        logging.error('Отсутствует ключ "homework_name"')
-        raise Exception('Нет названия работы')
+        raise ResponseFormatError(
+            'В ответе API отсутствует ключ "homework_name"')
 
     if 'status' not in homework:
-        logging.error('Отсутствует ключ "status"')
-        raise Exception('Нет статуса работы')
+        raise ResponseFormatError('В ответе API отсутствует ключ "status"')
 
-    status = homework['status']
     homework_name = homework['homework_name']
+    status = homework['status']
 
     if status not in HOMEWORK_VERDICTS:
-        logging.error(f'Неизвестный статус: {status}')
-        raise Exception(f'Неизвестный статус: {status}')
+        raise UnknownStatusError(f'Неизвестный статус работы: {status}')
 
     verdict = HOMEWORK_VERDICTS[status]
     return f'Изменился статус проверки работы "{homework_name}". {verdict}'
@@ -114,8 +131,10 @@ def parse_status(homework):
 
 def main():
     """Основная логика работы бота."""
-    if not check_tokens():
-        logging.critical('Программа остановлена')
+    missing_tokens = check_tokens()
+    if missing_tokens:
+        for token in missing_tokens:
+            logging.critical(f'Отсутствует переменная окружения: {token}')
         return
 
     try:
@@ -125,30 +144,49 @@ def main():
         logging.critical(f'Ошибка при создании сессии VK: {e}')
         return
 
-    timestamp = 0
-    last_error = None
+    logging.info('Бот успешно запущен')
+
+    last_sent_text = None
+    timestamp = int(time.time())
 
     while True:
         try:
             response = get_api_answer(timestamp)
             check_response(response)
-            timestamp = response.get('current_date', timestamp)
 
-            for homework in response.get('homeworks', []):
-                send_message(vk, parse_status(homework))
+            homeworks = response.get('homeworks', [])
 
-            last_error = None
+            if homeworks:
+                last_homework = homeworks[-1]
+                text = parse_status(last_homework)
 
-        except Exception as error:
-            error_message = f'Сбой в работе программы: {error}'
+                if text != last_sent_text:
+                    send_message(vk, text)
+                    last_sent_text = text
+                    logging.info(f'Отправлен новый статус: {text[:50]}...')
+                else:
+                    logging.debug(
+                        'Статус не изменился, сообщение не отправлено')
+            else:
+                logging.debug('Новых работ нет')
+
+        except Exception as e:
+            error_message = f'Ошибка: {e}'
             logging.error(error_message)
+            send_message(vk, error_message)
 
-            if str(error) != last_error:
-                send_message(vk, error_message)
-                last_error = str(error)
+        else:
+            timestamp = response.get('current_date', timestamp)
+            logging.debug('Временная метка обновлена')
 
-        time.sleep(RETRY_PERIOD)
+        finally:
+            time.sleep(RETRY_PERIOD)
 
 
 if __name__ == '__main__':
+    logging.basicConfig(
+        level=logging.INFO,
+        filename='program.log',
+        format='%(asctime)s, %(levelname)s, %(message)s, %(name)s'
+    )
     main()
