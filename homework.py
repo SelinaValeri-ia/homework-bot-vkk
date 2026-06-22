@@ -128,7 +128,8 @@ def main():
     missing_tokens = check_tokens()
     if missing_tokens:
         logging.critical(
-            f'Отсутствуют переменные окружения: {", ".join(missing_tokens)}')
+            f'Отсутствуют переменные окружения: {", ".join(missing_tokens)}'
+        )
         return
 
     try:
@@ -160,8 +161,7 @@ def main():
                         last_sent_message = text
                         logging.info(f'Отправлен новый статус: {text}...')
                     except Exception:
-                        logging.error(
-                            'Ошибка отправки, статус не обновлён')
+                        logging.error('Ошибка отправки, статус не обновлён')
             else:
                 no_changes_message = 'Нет новых статусов'
                 if no_changes_message != last_sent_message:
@@ -171,8 +171,7 @@ def main():
                         logging.debug(
                             'Отправлено сообщение об отсутствии изменений')
                     except Exception:
-                        logging.error(
-                            'Сбой отправки статуса')
+                        logging.error('Сбой отправки статуса')
 
         except Exception as e:
             error_message = f'Ошибка: {e}'
