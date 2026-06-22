@@ -151,29 +151,16 @@ def main():
             check_response(response)
 
             homeworks = response.get('homeworks', [])
+            message_to_send = parse_status(
+                homeworks[-1]) if homeworks else 'Нет новых статусов'
 
-            if homeworks:
-                last_homework = homeworks[-1]
-                text = parse_status(last_homework)
-
-                if text != last_sent_message:
-                    try:
-                        send_message(vk, text)
-                        last_sent_message = text
-                        logging.info(f'Отправлен новый статус: {text}...')
-                    except Exception:
-                        logging.error('Ошибка отправки, статус не обновлён')
-            else:
-                no_changes_message = 'Нет новых статусов'
-                if no_changes_message != last_sent_message:
-                    try:
-                        send_message(vk, no_changes_message)
-                        last_sent_message = no_changes_message
-                        logging.debug(
-                            'Отправлено сообщение об отсутствии изменений'
-                        )
-                    except Exception:
-                        logging.error('Сбой отправки статуса')
+            if message_to_send != last_sent_message:
+                try:
+                    send_message(vk, message_to_send)
+                    last_sent_message = message_to_send
+                    logging.info(f'Отправлено: {message_to_send[:50]}...')
+                except Exception:
+                    logging.error('Ошибка отправки')
 
         except Exception as e:
             error_message = f'Ошибка: {e}'
