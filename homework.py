@@ -108,7 +108,8 @@ def parse_status(homework):
     """Извлекает статус работы и формирует текст сообщения."""
     if 'homework_name' not in homework:
         raise ResponseFormatError(
-            'В ответе API отсутствует ключ "homework_name"')
+            'В ответе API отсутствует ключ "homework_name"'
+        )
 
     if 'status' not in homework:
         raise ResponseFormatError('В ответе API отсутствует ключ "status"')
@@ -169,7 +170,8 @@ def main():
                         send_message(vk, no_changes_message)
                         last_sent_message = no_changes_message
                         logging.debug(
-                            'Отправлено сообщение об отсутствии изменений')
+                            'Отправлено сообщение об отсутствии изменений'
+                        )
                     except Exception:
                         logging.error('Сбой отправки статуса')
 
