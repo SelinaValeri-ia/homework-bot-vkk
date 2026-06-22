@@ -2,6 +2,7 @@ import logging
 import os
 import random
 import time
+
 import requests
 import vk_api
 from dotenv import load_dotenv
@@ -10,25 +11,17 @@ from dotenv import load_dotenv
 class ApiRequestError(Exception):
     """Ошибка запроса к API."""
 
-    pass
-
 
 class ApiStatusError(Exception):
     """Ошибка: API вернул не 200."""
-
-    pass
 
 
 class ResponseFormatError(TypeError):
     """Ошибка формата ответа API."""
 
-    pass
-
 
 class UnknownStatusError(Exception):
     """Ошибка: неизвестный статус работы."""
-
-    pass
 
 
 load_dotenv()
@@ -68,11 +61,12 @@ def send_message(vk, message):
             message=message,
             random_id=random.randint(1, 1000000),
         )
-        logging.debug(f'Сообщение отправлено: {message[:50]}...')
     except (vk_api.exceptions.ApiError,
             requests.exceptions.RequestException) as e:
         logging.error(f'Ошибка при отправке сообщения: {e}')
         raise
+    else:
+        logging.debug(f'Сообщение отправлено: {message[:50]}...')
 
 
 def get_api_answer(timestamp):
@@ -133,8 +127,8 @@ def main():
     """Основная логика работы бота."""
     missing_tokens = check_tokens()
     if missing_tokens:
-        for token in missing_tokens:
-            logging.critical(f'Отсутствует переменная окружения: {token}')
+        logging.critical(
+            f'Отсутствуют переменные окружения: {", ".join(missing_tokens)}')
         return
 
     try:
@@ -146,7 +140,7 @@ def main():
 
     logging.info('Бот успешно запущен')
 
-    last_sent_text = None
+    last_sent_message = None
     timestamp = int(time.time())
 
     while True:
@@ -160,15 +154,25 @@ def main():
                 last_homework = homeworks[-1]
                 text = parse_status(last_homework)
 
-                if text != last_sent_text:
-                    send_message(vk, text)
-                    last_sent_text = text
-                    logging.info(f'Отправлен новый статус: {text[:50]}...')
-                else:
-                    logging.debug(
-                        'Статус не изменился, сообщение не отправлено')
+                if text != last_sent_message:
+                    try:
+                        send_message(vk, text)
+                        last_sent_message = text
+                        logging.info(f'Отправлен новый статус: {text}...')
+                    except Exception:
+                        logging.error(
+                            'Ошибка отправки, статус не обновлён')
             else:
-                logging.debug('Новых работ нет')
+                no_changes_message = 'Нет новых статусов'
+                if no_changes_message != last_sent_message:
+                    try:
+                        send_message(vk, no_changes_message)
+                        last_sent_message = no_changes_message
+                        logging.debug(
+                            'Отправлено сообщение об отсутствии изменений')
+                    except Exception:
+                        logging.error(
+                            'Сбой отправки статуса')
 
         except Exception as e:
             error_message = f'Ошибка: {e}'
@@ -177,7 +181,6 @@ def main():
 
         else:
             timestamp = response.get('current_date', timestamp)
-            logging.debug('Временная метка обновлена')
 
         finally:
             time.sleep(RETRY_PERIOD)
