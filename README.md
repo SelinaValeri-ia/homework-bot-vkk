@@ -11,10 +11,9 @@ cd homework-bot-vk
 2. Создайте и активируйте виртуальное окружение:
 python -m venv venv
 source venv/bin/activate  # для Linux/MacOS
-# или
 venv\Scripts\activate  # для Windows
 
-3.Установите необходимые зависимости:
+3. Установите необходимые зависимости:
 pip install -r requirements.txt
 
 ## Настройка переменных окружения
