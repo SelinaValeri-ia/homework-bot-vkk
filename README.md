@@ -20,19 +20,24 @@ pip install -r requirements.txt
 
 Создайте файл .env в корневой директории проекта и добавьте следующие переменные:
 PRACTICUM_TOKEN=your_practicum_token_here
+
 VK_TOKEN=your_vk_token_here
+
 VK_USER_ID=your_vk_user_id_here
 
 Описание переменных:
 PRACTICUM_TOKEN	- Токен для доступа к API Яндекс.Практикума
+
 Пример:
 eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...
 
 VK_TOKEN - Токен доступа VK API	
+
 Пример:
 vk1.a.abcdefghijklmnopqrstuvwxyz...
 
 VK_USER_ID - ID пользователя VK для отправки сообщений	
+
 Пример:
 123456789
 
