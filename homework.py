@@ -151,19 +151,13 @@ def main():
             check_response(response)
 
             homeworks = response.get('homeworks', [])
-            message_to_send = parse_status(
-                homeworks[-1]) if homeworks else 'Нет новых статусов'
+            message_to_send = (
+                parse_status(homeworks[-1])
+                if homeworks else 'Нет новых статусов'
+            )
 
             if message_to_send != last_sent_message:
                 send_message(vk, message_to_send)
-                last_sent_message = message_to_send
-                logging.info(f'Отправлено: {message_to_send[:50]}...')
-
-                new_timestamp = response.get('current_date')
-                if new_timestamp:
-                    timestamp = new_timestamp
-            else:
-                logging.debug('Сообщение уже отправлено')
 
         except Exception as e:
             error_message = f'Ошибка: {e}'
@@ -172,9 +166,10 @@ def main():
             if error_message != last_sent_message:
                 send_message(vk, error_message)
                 last_sent_message = error_message
-                logging.info(f'Отправлена ошибка:{error_message[:50]}...')
-            else:
-                logging.debug('Сообщение об ошибке уже было отправлено')
+
+        else:
+            timestamp = response.get('current_date', timestamp)
+            last_sent_message = message_to_send
 
         finally:
             time.sleep(RETRY_PERIOD)
